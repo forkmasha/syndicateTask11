@@ -42,75 +42,76 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
-        String eventResource = event.getResource();
-        String eventHttpMethod = event.getHttpMethod();
-        String eventBody = event.getBody();
-        String id = event.getPathParameters() != null ? event.getPathParameters().getOrDefault("id", "") : "";
+        String resource = event.getResource();
+        String httpMethod = event.getHttpMethod();
+        String body = event.getBody();
+        String tableId = event.getPathParameters() != null ? event.getPathParameters().getOrDefault("tableId", "") : "";
 
-        System.out.println("INFO: Environment Variables Loaded");
-        System.out.println("INFO: REGION = " + System.getenv("REGION"));
-        System.out.println("INFO: COGNITO_ID = " + System.getenv("COGNITO_ID"));
-        System.out.println("INFO: CLIENT_ID = " + System.getenv("CLIENT_ID"));
+        System.out.println("DEBUG: COGNITO_ID = " + System.getenv("COGNITO_ID"));
+        System.out.println("DEBUG: CLIENT_ID = " + System.getenv("CLIENT_ID"));
+        System.out.println("DEBUG: REGION = " + System.getenv("REGION"));
+
 
         try (CognitoIdentityProviderClient cognitoClient = CognitoIdentityProviderClient.builder()
                 .region(Region.of(System.getenv("REGION"))).build()) {
 
             String userPoolId = System.getenv("COGNITO_ID");
-            System.out.println("INFO: Cognito User Pool ID in use: " + userPoolId);
+            System.out.println("DEBUG: Using User Pool ID: " + userPoolId);
 
-            if (userPoolId == null || userPoolId.isEmpty()) {
-                System.err.println("WARNING: Missing or misconfigured Cognito User Pool ID");
-            }
 
-            System.out.println("INFO: Processing request");
-            System.out.println("INFO: Resource: " + eventResource);
-            System.out.println("INFO: HTTP Method: " + eventHttpMethod);
-            System.out.println("INFO: Request Body: " + eventBody);
 
-            switch (eventResource) {
+
+            System.err.println("ERROR: User Pool ID is missing or not set correctly! Value: " + userPoolId);
+            System.err.println("ERROR: COGNITO_ID environment variable might be missing or misconfigured.");
+
+            System.out.println("DEBUG: Incoming request details:");
+            System.out.println("DEBUG: Resource - " + resource);
+            System.out.println("DEBUG: HTTP Method - " + httpMethod);
+            System.out.println("DEBUG: Request Body - " + body);
+
+            switch (resource) {
                 case "/signup":
-                    System.out.println("INFO: Handling user signup");
-                    return HttpMethod.POST.toString().equals(eventHttpMethod)
-                            ? cognitoService.signUp(cognitoClient, userPoolId, eventBody)
-                            : badRequestResponse();
+                    System.out.println("DEBUG: Calling signUp() function");
+                    return HttpMethod.POST.toString().equals(httpMethod)
+                            ? cognitoService.signUp(cognitoClient, userPoolId, body)
+                            : errorResponse();
 
                 case "/signin":
-                    System.out.println("INFO: Handling user signin");
-                    return HttpMethod.POST.toString().equals(eventHttpMethod)
-                            ? cognitoService.signIn(cognitoClient, userPoolId, eventBody)
-                            : badRequestResponse();
+                    System.out.println("DEBUG: Calling signIn() function");
+                    return HttpMethod.POST.toString().equals(httpMethod)
+                            ? cognitoService.signIn(cognitoClient, userPoolId, body)
+                            : errorResponse();
 
                 case "/tables":
-                    System.out.println("INFO: Handling table creation or retrieval");
-                    return HttpMethod.POST.toString().equals(eventHttpMethod)
-                            ? databaseService.createTable(eventBody)
+                    System.out.println("DEBUG: Calling createTable() or getTables() function");
+                    return HttpMethod.POST.toString().equals(httpMethod)
+                            ? databaseService.createTable(body)
                             : databaseService.getTables();
 
-                case "/tables/{id}":
-                    System.out.println("INFO: Retrieving table with ID: " + id);
-                    return HttpMethod.GET.toString().equals(eventHttpMethod)
-                            ? databaseService.getTableById(id)
-                            : badRequestResponse();
+                case "/tables/{tableId}":
+                    System.out.println("DEBUG: Calling getTableById() function with tableId: " + tableId);
+                    return HttpMethod.GET.toString().equals(httpMethod)
+                            ? databaseService.getTableById(tableId)
+                            : errorResponse();
 
                 case "/reservations":
-                    System.out.println("INFO: Handling reservation creation or retrieval");
-                    return HttpMethod.POST.toString().equals(eventHttpMethod)
-                            ? databaseService.createReservation(eventBody)
+                    System.out.println("DEBUG: Calling createReservation() or getReservations() function");
+                    return HttpMethod.POST.toString().equals(httpMethod)
+                            ? databaseService.createReservation(body)
                             : databaseService.getReservations();
 
                 default:
-                    System.err.println("ERROR: Unknown API endpoint requested - " + eventResource);
-                    return badRequestResponse();
+                    System.err.println("ERROR: Unknown API resource requested - " + resource);
+                    return errorResponse();
             }
 
         } catch (Exception e) {
-            System.err.println("ERROR: An unexpected error occurred during request processing");
             e.printStackTrace();
         }
-        return badRequestResponse();
+        return errorResponse();
     }
 
-    private APIGatewayProxyResponseEvent badRequestResponse() {
-        return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("{\"error\": \"Invalid request. Please check the API documentation.\"}");
+    private APIGatewayProxyResponseEvent errorResponse() {
+        return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("{\"message\": \"Bad Request\"}");
     }
 }

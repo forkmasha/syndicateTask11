@@ -35,6 +35,7 @@ public class DatabaseService {
                         .withBody("{\"message\": \"Missing 'id' field in request body\"}");
             }
 
+            // ✅ Convert ID to String
             String tableId = String.valueOf(requestMap.get("id"));
 
             Item item = new Item()
@@ -75,7 +76,7 @@ public class DatabaseService {
             Table tablesTable = dynamoDB.getTable(TABLES_TABLE_NAME);
             Map<String, Object> requestMap = objectMapper.readValue(body, HashMap.class);
 
-
+            // ✅ Extract and normalize table ID
             String tableId = requestMap.containsKey("tableId") ? requestMap.get("tableId").toString() :
                     requestMap.containsKey("tableNumber") ? requestMap.get("tableNumber").toString() : null;
 
@@ -85,14 +86,14 @@ public class DatabaseService {
                         .withBody("{\"message\": \"Missing 'tableId' field in request body\"}");
             }
 
-
+            // ✅ Extract other required fields
             String customerName = requestMap.getOrDefault("customerName", requestMap.get("clientName")).toString();
             String customerEmail = requestMap.getOrDefault("customerEmail", requestMap.get("phoneNumber")).toString();
             String reservationDate = requestMap.getOrDefault("reservationDate", requestMap.get("date")).toString();
             String slotStart = requestMap.getOrDefault("slotTimeStart", "").toString();
             String slotEnd = requestMap.getOrDefault("slotTimeEnd", "").toString();
 
-
+            // ✅ Validate required fields
             if (customerName == null || customerEmail == null || reservationDate == null || slotStart.isEmpty() || slotEnd.isEmpty()) {
                 return new APIGatewayProxyResponseEvent()
                         .withStatusCode(400)
@@ -109,7 +110,7 @@ public class DatabaseService {
                         .withBody("{\"message\": \"Invalid table number format\"}");
             }
 
-
+            // ❌ Check if table exists (Integration of `isTableExist`)
             if (!isTableExist(tableNumber)) {
                 System.out.println("Validation failed < Table does not exist >");
                 return new APIGatewayProxyResponseEvent()
@@ -117,7 +118,7 @@ public class DatabaseService {
                         .withBody("{\"message\": \"Table does not exist\"}");
             }
 
-
+            // ✅ Check for overlapping reservations
             ScanSpec scanSpec = new ScanSpec();
             ItemCollection<ScanOutcome> reservations = reservationTable.scan(scanSpec);
 
@@ -134,7 +135,7 @@ public class DatabaseService {
                 }
             }
 
-
+            // ✅ Create new reservation
             String reservationId = UUID.randomUUID().toString();
             Item item = new Item()
                     .withPrimaryKey("id", reservationId)
@@ -159,9 +160,15 @@ public class DatabaseService {
         }
     }
 
+
+    // ✅ Utility function to check time slot overlap
     private boolean isTimeOverlap(String existingStart, String existingEnd, String newStart, String newEnd) {
         return (newStart.compareTo(existingEnd) < 0 && newEnd.compareTo(existingStart) > 0);
     }
+
+
+
+
 
     public APIGatewayProxyResponseEvent getTables() {
         try {
@@ -239,6 +246,8 @@ public class DatabaseService {
         }
     }
 
+
+
     public APIGatewayProxyResponseEvent getTableById(String id) {
         try {
             if (TABLES_TABLE_NAME == null || TABLES_TABLE_NAME.isEmpty()) {
@@ -263,6 +272,7 @@ public class DatabaseService {
             tableData.put("isVip", item.getBoolean("isVip"));
             tableData.put("minOrder", item.hasAttribute("minOrder") ? item.getInt("minOrder") : null);
 
+            // ✅ Return properly formatted JSON
             return new APIGatewayProxyResponseEvent()
                     .withStatusCode(200)
                     .withBody(objectMapper.writeValueAsString(tableData));
